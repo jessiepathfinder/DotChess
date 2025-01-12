@@ -12,9 +12,9 @@ namespace DotChess.Train.DecisionTree
 {
 	internal static class Program
 	{
-		private const double valueUpdateSize = 0.1;
+		private const double valueUpdateSize = 1.0;
 		private const double nvalueUpdateSize = -valueUpdateSize;
-		private const double damping = 0.25;
+		private const double momentum = 0.99;
 		private const int batchesCount = 2048;
 		private const int gamesPerBatch = 16;
 		private static readonly ConcurrentBag<(Piece[,], double)> concurrentBag = new();
@@ -67,11 +67,11 @@ namespace DotChess.Train.DecisionTree
 		}
 		private static IEnumerable<(ReadOnlyMemory<ushort>,double)> GetBoostedTargets(IEnumerable<(ReadOnlyMemory<ushort>,double)> data,DecisionTreeNode<Void>[] prev){
 			int len = prev.Length;
-			double damp = damping * len;
+			double m = momentum / len;
 			foreach((ReadOnlyMemory<ushort> a,double s) in data){
 				double sum = 0;
 				for (int i = 0; i < len; ++i) sum += DecisionTreeUtils.Eval(prev[i], a.Span, DecisionTreeUtils.extendedTensorSize);
-				yield return (a, Math.Clamp(s - (sum * damp),nvalueUpdateSize,valueUpdateSize));
+				yield return (a, (s - (sum * m)) / 2.0);
 			}
 		}
 
