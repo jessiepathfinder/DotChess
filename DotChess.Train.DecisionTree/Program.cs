@@ -55,17 +55,13 @@ namespace DotChess.Train.DecisionTree
 				Utils.ApplyMoveUnsafe(board, move);
 				blackturn = !blackturn;
 			}
+			double nvalue = -value;
 			ConcurrentBag<(Piece[,], double)> concurrentBag = Program.concurrentBag;
 #pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
 			while (bqueue.TryDequeue(out Piece[,] board1))
 			{
 				concurrentBag.Add((board1, value));
-				bool nocastle = !Utils.HasAttributes(board1[0, 0] | board[7, 0] | board1[7, 7] | board1[0, 7], Piece.castling_allowed);
-				if(nocastle){
-					board1 = Utils.CopyBoard(board1);
-					Utils.TransposeHorizontalUnsafe(board1);
-					concurrentBag.Add((board1, value));
-				}
+				
 				Piece[,] board2 = Utils.CopyBoard(board1);
 
 				//DATA AUGMENTATION rules:
@@ -73,13 +69,15 @@ namespace DotChess.Train.DecisionTree
 				//2. We can horizontal transpose board if all castling rights are lost
 
 				Utils.TransposeVerticalUnsafe(board2);
-				value = -value;
-				concurrentBag.Add((board2, value));
-				if (nocastle)
+				concurrentBag.Add((board2, nvalue));
+				if (Utils.HasAttributes(board1[0, 0] | board[7, 0] | board1[7, 7] | board1[0, 7], Piece.castling_allowed))
 				{
+					board1 = Utils.CopyBoard(board1);
+					Utils.TransposeHorizontalUnsafe(board1);
+					concurrentBag.Add((board1, value));
 					board2 = Utils.CopyBoard(board2);
 					Utils.TransposeHorizontalUnsafe(board2);
-					concurrentBag.Add((board2, value));
+					concurrentBag.Add((board2, nvalue));
 				}
 			}
 #pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
@@ -143,7 +141,7 @@ namespace DotChess.Train.DecisionTree
 				arr = queue.ToArray();
 
 				if (batchnr == batchesCount) break;
-				truncatedMinimaxChessEngine = new TruncatedMinimaxChessEngine(256.0, 65536, 5, new SumEvaluationFunction(new DecisionTreeEvaluationFunction(arr, true).Eval, TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimple).Eval);
+				truncatedMinimaxChessEngine = new TruncatedMinimaxChessEngine(256.0, 65536, 5, new SumEvaluationFunction(new AugmentedEvaluationFunction(new DecisionTreeEvaluationFunction(arr, true).Eval).Eval, TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimple).Eval);
 			}
 			File.WriteAllText(save, JsonConvert.SerializeObject(arr));
 		}

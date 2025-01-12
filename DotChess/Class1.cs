@@ -1433,4 +1433,27 @@ namespace DotChess
 			return first(board) + second(board);
 		}
 	}
+	public readonly struct AugmentedEvaluationFunction{
+		private readonly Func<Piece[,], double> underlying;
+
+		public AugmentedEvaluationFunction(Func<Piece[,], double> underlying)
+		{
+			this.underlying = underlying;
+		}
+		public double Eval(Piece[,] board){
+			Piece[,] board1 = Utils.CopyBoard(board);
+			Utils.TransposeVerticalUnsafe(board1);
+            double x = underlying(board) - underlying(board1);
+			if (Utils.HasAttributes(board[0, 0] | board[7, 0] | board[0, 7] | board[7, 7], Piece.castling_allowed))
+			{
+				return x / 2.0;
+			}
+			else {
+				board = Utils.CopyBoard(board);
+				Utils.TransposeHorizontalUnsafe(board);
+				Utils.TransposeHorizontalUnsafe(board1);
+				return (x + (underlying(board) - underlying(board1))) / 4.0;
+			}
+		}
+	}
 }
