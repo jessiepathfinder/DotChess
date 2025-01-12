@@ -129,10 +129,10 @@ namespace DotChess.Train.DecisionTree
 				}
 			endloop:
 				Console.WriteLine("Analyzing self-play data...");
-				IEnumerable<(ReadOnlyMemory<ushort>, double)> e = DecisionTreeUtils.GetCompressedStateMapsEfficient(ll, true);
+				IEnumerable<(ReadOnlyMemory<ushort>, double)> e = DecisionTreeUtils.GetCompressedStateMapsEfficient(ll, false);
 				if (batchnr > 0) e = GetBoostedTargets(e, arr);
 				
-				Task<DecisionTreeNode<Void>?> task =DecisionTreeUtils.TrainSingle(DecisionTreeUtils.extendedTensorSize, 0, 4, e, Console.WriteLine);
+				Task<DecisionTreeNode<Void>?> task =DecisionTreeUtils.TrainSingle(Utils.boardTensorSize, 0, 4, e, Console.WriteLine);
 
 				task.Wait();
 				DecisionTreeNode<Void>? decisionTreeNode = task.Result;
