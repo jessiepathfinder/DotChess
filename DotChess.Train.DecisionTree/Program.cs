@@ -57,9 +57,30 @@ namespace DotChess.Train.DecisionTree
 			}
 			ConcurrentBag<(Piece[,], double)> concurrentBag = Program.concurrentBag;
 #pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-			while (bqueue.TryDequeue(out Piece[,] board1)){
-				concurrentBag.Add((board, value));
+			while (bqueue.TryDequeue(out Piece[,] board1))
+			{
+				concurrentBag.Add((board1, value));
+				bool nocastle = !Utils.HasAttributes(board1[0, 0] | board[7, 0] | board1[7, 7] | board1[0, 7], Piece.castling_allowed);
+				if(nocastle){
+					board1 = Utils.CopyBoard(board1);
+					Utils.TransposeHorizontalUnsafe(board1);
+					concurrentBag.Add((board1, value));
+				}
+				Piece[,] board2 = Utils.CopyBoard(board1);
+
+				//DATA AUGMENTATION rules:
+				//1. We can always vertical transpose board
+				//2. We can horizontal transpose board if all castling rights are lost
+
+				Utils.TransposeVerticalUnsafe(board2);
 				value = -value;
+				concurrentBag.Add((board2, value));
+				if (nocastle)
+				{
+					board2 = Utils.CopyBoard(board2);
+					Utils.TransposeHorizontalUnsafe(board2);
+					concurrentBag.Add((board2, value));
+				}
 			}
 #pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
 			semaphoreSlim.Release();

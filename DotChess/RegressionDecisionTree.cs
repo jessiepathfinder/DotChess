@@ -745,12 +745,13 @@ namespace DotChess.RegressionDecisionTree
 		}
 
 		public double Eval(Piece[,] board){
-			Span<ushort> span = stackalloc ushort[DecisionTreeUtils.maxExtendedCompressedStateMapSize];
+			(int csms, int xts) = extended ? (DecisionTreeUtils.maxExtendedCompressedStateMapSize, DecisionTreeUtils.extendedTensorSize) : (DecisionTreeUtils.maxCompressedStateMapSize, Utils.boardTensorSize);
+			Span<ushort> span = stackalloc ushort[csms];
 			int statesize = DecisionTreeUtils.GetCompressedStateMap(board, span, extended);
 			ReadOnlySpan<DecisionTreeNode<Void>> span2 = rom.Span;
 			double val = 0.0;
 			for(int i = 0,stop = span2.Length; i < stop; ++i){
-				val += DecisionTreeUtils.Eval(span2[i], span, DecisionTreeUtils.extendedTensorSize);
+				val += DecisionTreeUtils.Eval(span2[i], span, xts);
 			}
 			return val;
 		}
