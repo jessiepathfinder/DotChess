@@ -12,8 +12,6 @@ namespace DotChess.Train.DecisionTree
 {
 	internal static class Program
 	{
-		private const double valueUpdateSize = 0.1;
-		private const double nvalueUpdateSize = -valueUpdateSize;
 		private const int batchesCount = 2048;
 		private const int gamesPerBatch = 16;
 		private static readonly ConcurrentBag<(Piece[,], double)> concurrentBag = new();
@@ -23,7 +21,7 @@ namespace DotChess.Train.DecisionTree
 			bool blackturn = false;
 			int drawCounter = 0;
 			Queue<Piece[,]> bqueue = new();
-			double value;
+			int value;
 
 			while (true)
 			{
@@ -31,7 +29,7 @@ namespace DotChess.Train.DecisionTree
 
 				if (conclusion != Conclusion.NORMAL)
 				{
-					value = (conclusion == Conclusion.CHECKMATE) ? (blackturn ? valueUpdateSize : nvalueUpdateSize) : 0.0;
+					value = (conclusion == Conclusion.CHECKMATE) ? (blackturn ? 1 : -1) : 0;
 					break;
 				}
 
@@ -41,7 +39,7 @@ namespace DotChess.Train.DecisionTree
 				//We do this so that if the 50th move resulted in a checkmate, the checkmate stands
 				if (drawCounter == 51)
 				{
-					value = 0.0;
+					value = 0;
 					break;
 				}
 				if (Utils.CheckResetsDrawCounter(board, move))
@@ -55,12 +53,13 @@ namespace DotChess.Train.DecisionTree
 				Utils.ApplyMoveUnsafe(board, move);
 				blackturn = !blackturn;
 			}
+			double dvalue = value;
 			double nvalue = -value;
 			ConcurrentBag<(Piece[,], double)> concurrentBag = Program.concurrentBag;
 #pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
 			while (bqueue.TryDequeue(out Piece[,] board1))
 			{
-				concurrentBag.Add((board1, value));
+				concurrentBag.Add((board1, dvalue));
 				
 				Piece[,] board2 = Utils.CopyBoard(board1);
 
@@ -74,7 +73,7 @@ namespace DotChess.Train.DecisionTree
 				{
 					board1 = Utils.CopyBoard(board1);
 					Utils.TransposeHorizontalUnsafe(board1);
-					concurrentBag.Add((board1, value));
+					concurrentBag.Add((board1, dvalue));
 					board2 = Utils.CopyBoard(board2);
 					Utils.TransposeHorizontalUnsafe(board2);
 					concurrentBag.Add((board2, nvalue));
@@ -137,7 +136,7 @@ namespace DotChess.Train.DecisionTree
 					Console.WriteLine("Saving interim model...");
 					File.WriteAllText(save + batchnr, JsonConvert.SerializeObject(queue.ToArray()));
 				}
-				myChessEngine = new RandomRedirectChessEngine(myChessEngine,new TruncatedMinimaxChessEngine(256.0, 65536, 5, new SumEvaluationFunction(new AugmentedEvaluationFunction(decisionTreeNode.Eval2).Eval, TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimple).Eval), 4096);
+				myChessEngine = new RandomRedirectChessEngine(myChessEngine,new TruncatedMinimaxChessEngine(256.0, 65536, 5, new AugmentedEvaluationFunction(decisionTreeNode.Eval2).Eval), 4096);
 			}
 			Console.WriteLine("Saving model...");
 			File.WriteAllText(save, JsonConvert.SerializeObject(queue.ToArray()));
@@ -161,7 +160,7 @@ namespace DotChess.Train.DecisionTree
 		{
 			foreach((ReadOnlyMemory<ushort> rom, double pred) in e2){
 
-				yield return (rom, (pred - CLE3(tree.Span, rom.Span)) * valueUpdateSize);
+				yield return (rom, (pred - CLE3(tree.Span, rom.Span)));
 			}
 		}
 		private static IEnumerable<(Piece[,] board, double extradata)> E2((Piece[,] board, int reward)[] arr){

@@ -256,11 +256,19 @@ namespace DotChess
 
 		public Move ComputeNextMove(Piece[,] board, bool black)
 		{
-			ReadOnlyMemory<Move> moves = Utils.GetLegalMoves(board, black).ToArray();
-			int len = moves.Length;
+			
+			Move[] moves1 = Utils.GetLegalMoves(board, black).ToArray();
+			int len = moves1.Length;
 			if (len == 0) throw new Exception("No possible moves (should not reach here)");
-			if (len == 1) return moves.Span[0];
+			if (len == 1) return moves1[0];
+			for (int i = 1; i < len;)
+			{
+				ref Move src = ref moves1[i];
+				ref Move dst = ref moves1[RandomNumberGenerator.GetInt32(0, ++i)];
+				(dst, src) = (src, dst);
+			}
 			Dictionary<(Piece[,] board, bool blackturn), ExplorationRequestDescriptor> cache = new Dictionary<(Piece[,] board, bool blackturn), ExplorationRequestDescriptor>(PlyEqualityComparer.instance);
+			ReadOnlyMemory<Move> moves = moves1;
 			ExplorationRequestDescriptor root = new ExplorationRequestDescriptor(board, black) { legalMovesOptional = moves };
 			cache.Add((board, black), root);
 			ReadOnlySpan<Move> span = moves.Span;
