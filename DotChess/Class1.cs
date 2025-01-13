@@ -1025,7 +1025,9 @@ namespace DotChess
 				string[] moves = line.Split(' ');
 				Piece[,] board = InitBoard();
 				bool blackturn = false;
-				for(int x = 0,stop = moves.Length; true; ){
+				int stop = stop = moves.Length;
+				bool blackadv = stop % 2 == 0;
+				for (int x = 0; true; ){
 					string strmove = moves[x];
 					char firstchar = strmove[0];
 					int len = strmove.Length;
@@ -1125,11 +1127,14 @@ namespace DotChess
 					throw new Exception("Illegal move!");
 					legalmove:
 					bool stopping = ++x == stop;
-					if (!dict.TryGetValue((board,blackturn),out Dictionary<Move,bool> mq)){
-						mq = new();
-						dict.Add((stopping ? board : CopyBoard(board),blackturn),mq);
+					if(blackadv == blackturn){
+						if (!dict.TryGetValue((board, blackturn), out Dictionary<Move, bool> mq))
+						{
+							mq = new();
+							dict.Add((stopping ? board : CopyBoard(board), blackturn), mq);
+						}
+						mq.TryAdd(themove, false);
 					}
-					mq.TryAdd(themove,false);
 					if (stopping) break;
 					ApplyMoveUnsafe(board, themove);
 					blackturn = !blackturn;
