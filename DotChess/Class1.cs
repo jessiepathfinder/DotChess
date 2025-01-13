@@ -1603,6 +1603,39 @@ namespace DotChess
 			return (rnd > alternativeProbabilityX65536 ? alternative : preferred).ComputeNextMove(board, black);
 		}
 	}
+	public sealed class QueenGambitOrBailout : IChessEngine
+	{
+		private readonly IChessEngine bailout;
+		private static readonly Piece[,] startstate = Utils.InitBoard();
+		private static readonly Move themove = new Move(new Coordinate((byte)3, (byte)1), new Coordinate((byte)3, (byte)3));
+
+		public QueenGambitOrBailout(IChessEngine bailout)
+		{
+			this.bailout = bailout;
+		}
+
+		public Move ComputeNextMove(Piece[,] board, bool black)
+		{
+			if(!black){
+				Piece[,] startstate = QueenGambitOrBailout.startstate;
+				for (int x = 0; x < 2;++x){
+					for(int y = 0; y < 8; ++y){
+						if (board[y, x] != startstate[y, x]) goto bailout;
+					}
+				}
+				for (int x = 6; x < 8; ++x)
+				{
+					for (int y = 0; y < 8; ++y)
+					{
+						if (board[y, x] != startstate[y, x]) goto bailout;
+					}
+				}
+				return themove;
+			}
+		bailout:
+			return bailout.ComputeNextMove(board, black);
+		}
+	}
 	public sealed class HardcodedTablebaseChessEngine : IChessEngine{
 		private readonly IChessEngine bailout;
 		private readonly IReadOnlyDictionary<(Piece[,], bool),ReadOnlyMemory<Move>> dict;

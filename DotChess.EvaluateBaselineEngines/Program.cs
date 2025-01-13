@@ -13,7 +13,7 @@ namespace DotChess.EvaluateBaselineEngines
 		{
 
 
-			EvalImpl(new ExtendedChessEngineAdapter(new HardcodedTablebaseChessEngine(new TruncatedMinimaxChessEngine(512.0,65536,5,TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimple), Utils.LoadOpeningTablebase(File.ReadAllText("tablebase.txt")))), new ExtendedChessEngineAdapter(new TruncatedMinimaxChessEngine(512.0, 65536, 5, TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimple)), "Minimax+Tablebase", "Minimax");
+			EvalImpl(new ExtendedChessEngineAdapter(new QueenGambitOrBailout(new HardcodedTablebaseChessEngine(new TruncatedMinimaxChessEngine(512.0,65536,5,TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimple), Utils.LoadOpeningTablebase(File.ReadAllText("tablebase.txt"))))), new ExtendedChessEngineAdapter(new TruncatedMinimaxChessEngine(512.0, 65536, 5, TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimple)), "Minimax+Tablebase", "Minimax");
 			//EvalImpl(new MonteCarloChessEngine(100, 1.0, 0.99), new ExtendedChessEngineAdapter(GreedyCaptureRandomChessEngine.instance), "a", "b");
 
 		}
