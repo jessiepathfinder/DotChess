@@ -1,5 +1,8 @@
-﻿using System.ComponentModel;
+﻿using Microsoft.VisualBasic;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.ComponentModel.Design;
+using System.ComponentModel.Design.Serialization;
 using System.Diagnostics.CodeAnalysis;
 using System.Net.NetworkInformation;
 using System.Numerics;
@@ -1013,6 +1016,131 @@ namespace DotChess
 		{
 			return HasAttributes(board[move.source.x, move.source.y], Piece.pawn) || (board[move.target.x, move.target.y] != Piece.empty);
 		}
+		public static IReadOnlyDictionary<(Piece[,] board, bool blackturn),ReadOnlyMemory<Move>> LoadOpeningTablebase(string tablebase){
+			string[] lines = tablebase.Split('\n');
+			Dictionary<(Piece[,] board, bool blackturn), Dictionary<Move,bool>> dict = new(PlyEqualityComparer.instance);
+			for(int i = 0,limit = lines.Length;i<limit;++i){
+				string line = lines[i];
+				if (line.StartsWith('#')) continue;
+				string[] moves = line.Split(' ');
+				Piece[,] board = InitBoard();
+				bool blackturn = false;
+				for(int x = 0,stop = moves.Length; true; ){
+					string strmove = moves[x];
+					char firstchar = strmove[0];
+					int len = strmove.Length;
+
+					//Convert PGN coordinate to DotChess coordinate
+					Coordinate destination;
+					Coordinate source;
+					if(strmove.StartsWith("O-O")){
+						byte srcy = blackturn ? (byte)7 : (byte)0;
+						byte dstx = (strmove.Length == 5) ? (byte)2 : (byte)6;
+						source = new Coordinate(4, srcy);
+						destination = new Coordinate(dstx, srcy);
+						goto castled;
+					}
+					destination = new Coordinate((byte)(strmove[len - 2] - 'a'), (byte)(strmove[len - 1] - '1'));
+
+					Piece piece = firstchar switch
+					{
+						'K' => Piece.king,
+						'Q' => Piece.queen,
+						'R' => Piece.rook,
+						'N' => Piece.horse,
+						'B' => Piece.bishop,
+						_ => Piece.pawn
+					};
+					bool found = false;
+					source = default;
+					bool xpawn = piece == Piece.pawn;
+					if (blackturn) piece |= Piece.black;
+					foreach(Move move in GetLegalMoves(board,blackturn)){
+						if(move.target == destination & ((board[move.source.x,move.source.y] & (Piece.pawn | Piece.king | Piece.horse | Piece.queen | Piece.black)) == piece)){
+							if(found){
+								int inc = Utils.HasAttributes(piece,Piece.pawn) ? 0 : 1;
+								char thechar1 = strmove[inc];
+								if(char.IsNumber(thechar1)){
+									int i5 = thechar1 - '1';
+									byte b5 = (byte)i5;
+									bool found1 = false;
+									for (int i4 = 0; i4 < 8; ++i4)
+									{
+										if ((board[i4, i5] & (Piece.pawn | Piece.king | Piece.horse | Piece.queen | Piece.black)) == piece)
+										{
+											Coordinate mycoord = new Coordinate((byte)i4, b5);
+											if (mycoord != move.source) continue;
+											if (found1) throw new Exception("Ambiguous move");
+											found1 = true;
+											source = mycoord;
+										}
+									}
+									if (!found1) goto skippy;
+									break;
+								}
+
+								int i1 = (thechar1 - 'a');
+								char thechar = strmove[inc+1];
+								byte b2;
+								if(char.IsNumber(thechar)){
+									source = new Coordinate((byte)i1, (byte)(thechar - '1'));
+								} else{
+									if (thechar == 'x'){
+										i1 = strmove[inc] - 'a';
+									}
+									bool found1 = false;
+									byte b1 = (byte)i1;
+									for(int i2 = 0; i2 < 8; ++i2){
+										if((board[i1, i2] & (Piece.pawn | Piece.king | Piece.horse | Piece.queen | Piece.black)) == piece){
+											Coordinate tempcoord = new Coordinate(b1, (byte)i2);
+											if(tempcoord != move.source) continue;
+											if (found1) throw new Exception("Ambiguous move1");
+											source = tempcoord;
+											found1 = true;
+										}
+									}
+									if (!found1) goto skippy;
+								}
+								
+								;
+								break;
+							} else{
+								source = move.source;
+								found = true;
+							}
+						}
+					skippy:;
+					}
+					if (!found) throw new Exception("Invalid move!");
+
+					castled:
+					Move themove = new Move(source, destination);
+					//Double check if move is legal
+					foreach (Move move in GetLegalMoves(board, blackturn))
+					{
+						if(move == themove){
+							goto legalmove;
+						}
+					}
+					throw new Exception("Illegal move!");
+					legalmove:
+					bool stopping = ++x == stop;
+					if (!dict.TryGetValue((board,blackturn),out Dictionary<Move,bool> mq)){
+						mq = new();
+						dict.Add((stopping ? board : CopyBoard(board),blackturn),mq);
+					}
+					mq.TryAdd(themove,false);
+					if (stopping) break;
+					ApplyMoveUnsafe(board, themove);
+					blackturn = !blackturn;
+				}
+			}
+			Dictionary<(Piece[,],bool), ReadOnlyMemory<Move>> dict1 = new(PlyEqualityComparer.instance);
+			foreach(KeyValuePair<(Piece[,],bool),Dictionary<Move,bool>> keyValuePair in dict){
+				dict1.Add(keyValuePair.Key, keyValuePair.Value.Keys.ToArray());
+			}
+			return dict1;
+		}
 		public static uint ApplyMoveUnsafe(Piece[,] board, Move move){
 			int sy = move.source.y;
 			int tx = move.target.x;
@@ -1473,6 +1601,28 @@ namespace DotChess
 			ushort rnd = 0;
 			RandomNumberGenerator.Fill(MemoryMarshal.AsBytes(new Span<ushort>(ref rnd)));
 			return (rnd > alternativeProbabilityX65536 ? alternative : preferred).ComputeNextMove(board, black);
+		}
+	}
+	public sealed class HardcodedTablebaseChessEngine : IChessEngine{
+		private readonly IChessEngine bailout;
+		private readonly IReadOnlyDictionary<(Piece[,], bool),ReadOnlyMemory<Move>> dict;
+
+		public HardcodedTablebaseChessEngine(IChessEngine bailout, IReadOnlyDictionary<(Piece[,], bool), ReadOnlyMemory<Move>> dict)
+		{
+			this.bailout = bailout;
+			this.dict = dict;
+		}
+
+		public Move ComputeNextMove(Piece[,] board, bool black)
+		{
+			if(dict.TryGetValue((board,black),out ReadOnlyMemory<Move> moves)){
+				ReadOnlySpan<Move> ros = moves.Span;
+				int rl = ros.Length;
+				if (rl == 0) goto bailout;
+				return ros[(rl == 1) ? 0 : RandomNumberGenerator.GetInt32(0, rl)];
+			}
+		bailout:
+			return bailout.ComputeNextMove(board, black);
 		}
 	}
 }
