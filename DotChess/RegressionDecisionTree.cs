@@ -41,7 +41,7 @@ namespace DotChess.RegressionDecisionTree
 		public double Eval2(Piece[,] board){
 			Span<ushort> span = stackalloc ushort[DecisionTreeUtils.maxCompressedStateMapSize];
 			int statesize = DecisionTreeUtils.GetCompressedStateMap(board, span, false);
-			return DecisionTreeUtils.Eval(this, span[..statesize], DecisionTreeUtils.maxCompressedStateMapSize);
+			return DecisionTreeUtils.Eval(this, span[..statesize], Utils.boardTensorSize);
 		}
 		public double Eval(ReadOnlySpan<bool> featureMask){
 			return EvalOrDefault(featureMask[feature] ? left : right, featureMask);
