@@ -1456,4 +1456,23 @@ namespace DotChess
 			}
 		}
 	}
+	public sealed class RandomRedirectChessEngine : IChessEngine{
+		private readonly IChessEngine preferred;
+		private readonly IChessEngine alternative;
+		private readonly ushort alternativeProbabilityX65536;
+
+		public RandomRedirectChessEngine(IChessEngine preferred, IChessEngine alternative, ushort alternativeProbabilityX65536)
+		{
+			this.preferred = preferred;
+			this.alternative = alternative;
+			this.alternativeProbabilityX65536 = alternativeProbabilityX65536;
+		}
+
+		public Move ComputeNextMove(Piece[,] board, bool black)
+		{
+			ushort rnd = 0;
+			RandomNumberGenerator.Fill(MemoryMarshal.AsBytes(new Span<ushort>(ref rnd)));
+			return (rnd > alternativeProbabilityX65536 ? alternative : preferred).ComputeNextMove(board, black);
+		}
+	}
 }

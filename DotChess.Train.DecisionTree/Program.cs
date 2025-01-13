@@ -12,13 +12,13 @@ namespace DotChess.Train.DecisionTree
 {
 	internal static class Program
 	{
-		private const double valueUpdateSize = 1.0;
+		private const double valueUpdateSize = 0.1;
 		private const double nvalueUpdateSize = -valueUpdateSize;
 		private const int batchesCount = 2048;
 		private const int gamesPerBatch = 16;
 		private static readonly ConcurrentBag<(Piece[,], double)> concurrentBag = new();
 		private static readonly SemaphoreSlim semaphoreSlim = new SemaphoreSlim(0,gamesPerBatch);
-		private static void WorkerThread(TruncatedMinimaxChessEngine truncatedMinimaxChessEngine){
+		private static void WorkerThread(IChessEngine chessEngine){
 			Piece[,] board = Utils.InitBoard();
 			bool blackturn = false;
 			int drawCounter = 0;
@@ -27,7 +27,7 @@ namespace DotChess.Train.DecisionTree
 
 			while (true)
 			{
-				Conclusion conclusion = Utils.ConditionalInvokeChessEngine(board, blackturn, truncatedMinimaxChessEngine, out Move move, out _);
+				Conclusion conclusion = Utils.ConditionalInvokeChessEngine(board, blackturn, chessEngine, out Move move, out _);
 
 				if (conclusion != Conclusion.NORMAL)
 				{
@@ -83,27 +83,16 @@ namespace DotChess.Train.DecisionTree
 #pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
 			semaphoreSlim.Release();
 		}
-		private static IEnumerable<(ReadOnlyMemory<ushort>,double)> GetBoostedTargets(IEnumerable<(ReadOnlyMemory<ushort>,double)> data,DecisionTreeNode<Void>[] prev){
-			int len = prev.Length;
-			double m = len;
-			foreach((ReadOnlyMemory<ushort> a,double s) in data){
-				double sum = 0;
-				for (int i = 0; i < len; ++i) sum += DecisionTreeUtils.Eval(prev[i], a.Span, DecisionTreeUtils.extendedTensorSize);
-				yield return (a, (s - (sum / m)));
-			}
-		}
+
 
 		static void Main(string[] args)
 		{
 			Console.WriteLine("Preparing to start training...");
 			string save = args[0];
-
-			TruncatedMinimaxChessEngine truncatedMinimaxChessEngine = new TruncatedMinimaxChessEngine(256.0, 65536, 5, TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimple);
-			Queue<DecisionTreeNode<Void>> queue = new Queue<DecisionTreeNode<Void>>();
-			DecisionTreeNode<Void>[] arr = new DecisionTreeNode<Void>[0];
+			IChessEngine myChessEngine = new TruncatedMinimaxChessEngine(512.0, 65536, 5, TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimple);
 
 			ConcurrentBag<(Piece[,], double)> concurrentBag = Program.concurrentBag;
-
+			Queue<DecisionTreeNode<Void>?> queue = new();
 
 
 			for (int batchnr = 0;true ; ++batchnr){
@@ -112,7 +101,7 @@ namespace DotChess.Train.DecisionTree
 				Console.WriteLine("Collecting data from self-play...");
 				
 				for(int i = 0; i < gamesPerBatch; ++i){
-					ThreadPool.QueueUserWorkItem(WorkerThread, truncatedMinimaxChessEngine, true);
+					ThreadPool.QueueUserWorkItem(WorkerThread, myChessEngine, true);
 				}
 				LinkedList<(Piece[,], double)> ll = new LinkedList<(Piece[,], double)>();
 				int waitcount = 0;
@@ -126,24 +115,32 @@ namespace DotChess.Train.DecisionTree
 					ll.AddLast(x);
 				}
 			endloop:
-				Console.WriteLine("Analyzing self-play data...");
+				Console.WriteLine("Updating decision tree...");
 				IEnumerable<(ReadOnlyMemory<ushort>, double)> e = DecisionTreeUtils.GetCompressedStateMapsEfficient(ll, false);
-				if (batchnr > 0) e = GetBoostedTargets(e, arr);
 				
-				Task<DecisionTreeNode<Void>?> task =DecisionTreeUtils.TrainSingle(Utils.boardTensorSize, 0, 4, e, Console.WriteLine);
+				
+				Task<DecisionTreeNode<Void>?> task =DecisionTreeUtils.TrainSingle(Utils.boardTensorSize, 8, int.MaxValue, e, Console.WriteLine);
 
 				task.Wait();
 				DecisionTreeNode<Void>? decisionTreeNode = task.Result;
 				if (decisionTreeNode is null) break;
-
-				Console.WriteLine("Modify chess engine...");
 				queue.Enqueue(decisionTreeNode);
-				arr = queue.ToArray();
+
+
+				
+				
+
+
 
 				if (batchnr == batchesCount) break;
-				truncatedMinimaxChessEngine = new TruncatedMinimaxChessEngine(256.0, 65536, 5, new SumEvaluationFunction(new AugmentedEvaluationFunction(new DecisionTreeEvaluationFunction(arr, true).Eval).Eval, TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimple).Eval);
+				if(batchnr > 0 & batchnr % 128 == 0){
+					Console.WriteLine("Saving interim model...");
+					File.WriteAllText(save + batchnr, JsonConvert.SerializeObject(queue.ToArray()));
+				}
+				myChessEngine = new RandomRedirectChessEngine(myChessEngine,new TruncatedMinimaxChessEngine(256.0, 65536, 5, new SumEvaluationFunction(new AugmentedEvaluationFunction(decisionTreeNode.Eval2).Eval, TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimple).Eval), 4096);
 			}
-			File.WriteAllText(save, JsonConvert.SerializeObject(arr));
+			Console.WriteLine("Saving model...");
+			File.WriteAllText(save, JsonConvert.SerializeObject(queue.ToArray()));
 		}
 		private static double CLE3<T>(ReadOnlySpan<DecisionTreeNode<T>> tree, ReadOnlySpan<ushort> rom)
 		{

@@ -4,6 +4,7 @@ using System.Collections;
 using System.Data;
 using System.Diagnostics.Metrics;
 using System.Runtime.ExceptionServices;
+using System.Runtime.Intrinsics.Arm;
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
 
@@ -37,7 +38,11 @@ namespace DotChess.RegressionDecisionTree
 		public DecisionTreeNode<T> ShallowClone(){
 			return new DecisionTreeNode<T>() {mean = mean, left = left?.ShallowClone(), right = right?.ShallowClone()};
 		}
-
+		public double Eval2(Piece[,] board){
+			Span<ushort> span = stackalloc ushort[DecisionTreeUtils.maxCompressedStateMapSize];
+			int statesize = DecisionTreeUtils.GetCompressedStateMap(board, span, false);
+			return DecisionTreeUtils.Eval(this, span[..statesize], DecisionTreeUtils.maxCompressedStateMapSize);
+		}
 		public double Eval(ReadOnlySpan<bool> featureMask){
 			return EvalOrDefault(featureMask[feature] ? left : right, featureMask);
 		}

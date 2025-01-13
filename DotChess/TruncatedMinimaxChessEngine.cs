@@ -197,7 +197,13 @@ namespace DotChess
 					return;
 				}
 				explorationRequestDescriptor.dilution = dilutionLimit;
-				legalMovesOptional = Utils.GetLegalMoves(board, blackturn).ToArray();
+				Move[] mva = Utils.GetLegalMoves(board, blackturn).ToArray();
+				for (int i = 1, stop = mva.Length; i < stop;){
+					ref Move src = ref mva[i];
+					ref Move dst = ref mva[RandomNumberGenerator.GetInt32(0,++i)];
+					(dst, src) = (src, dst);
+				}
+				legalMovesOptional = mva;
 				explorationRequestDescriptor.legalMovesOptional = legalMovesOptional;
 			}
 			

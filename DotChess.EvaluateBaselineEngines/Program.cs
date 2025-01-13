@@ -12,7 +12,7 @@ namespace DotChess.EvaluateBaselineEngines
 		static void Main(string[] args)
 		{
 
-			EvalImpl(new ExtendedChessEngineAdapter(new TruncatedMinimaxChessEngine(512.0,65536,5,TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimple)), new ExtendedChessEngineAdapter(new TruncatedMinimaxChessEngine(512.0, 0, 5, TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimple)), "MinimaxBeam", "Minimax");
+			EvalImpl(new ExtendedChessEngineAdapter(new TruncatedMinimaxChessEngine(256.0,65536,5, new SumEvaluationFunction(new AugmentedEvaluationFunction(new DecisionTreeEvaluationFunction(JsonConvert.DeserializeObject<DecisionTreeNode<Void>[]>(File.ReadAllText("z")), true).Eval).Eval,TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimple).Eval)), new ExtendedChessEngineAdapter(new TruncatedMinimaxChessEngine(256.0, 65536, 5, TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimple)), "MinimaxModel", "Minimax");
 			//EvalImpl(new MonteCarloChessEngine(100, 1.0, 0.99), new ExtendedChessEngineAdapter(GreedyCaptureRandomChessEngine.instance), "a", "b");
 
 		}
