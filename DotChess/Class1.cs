@@ -463,7 +463,7 @@ namespace DotChess
 						Piece piece = b2[x, y];
 						int s = (piece & (Piece.queen | Piece.horse | Piece.pawn)) switch
 						{
-							Piece.queen => 8,
+							Piece.queen => 9,
 							Piece.rook => 5,
 							Piece.bishop => 3,
 							Piece.pawn => 1,

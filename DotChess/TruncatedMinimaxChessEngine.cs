@@ -241,13 +241,39 @@ namespace DotChess
 					Piece piece = board[x, y];
 					int s = (piece & (Piece.queen | Piece.horse | Piece.pawn)) switch
 					{
-						Piece.queen => 8,
+						Piece.queen => 9,
 						Piece.rook => 5,
 						Piece.bishop => 3,
 						Piece.pawn => 1,
 						Piece.horse => 3,
 						_ => 0,
 					};
+					advantage += s * ((((int)(piece & Piece.black)) / 64) - 1);
+				}
+			}
+			return -advantage;
+		}
+		public static double ComputeAdvantageBalanceSimpleV2(Piece[,] board)
+		{
+			int advantage = 0;
+			for (int x = 0; x < 8; ++x)
+			{
+				for (int y = 0; y < 8; ++y)
+				{
+					Piece piece = board[x, y];
+					bool isblack = Utils.HasAttributes(piece, Piece.black);
+					bool offside = ((y < 4) & isblack) | ((y > 3) & !isblack);
+
+					int s = (piece & (Piece.queen | Piece.horse | Piece.pawn)) switch
+					{
+						Piece.queen => 9,
+						Piece.rook => 5,
+						Piece.bishop => 3,
+						Piece.pawn => offside ? 2 : 1,
+						Piece.horse => 3,
+						_ => 0,
+					};
+
 					advantage += s * ((((int)(piece & Piece.black)) / 64) - 1);
 				}
 			}

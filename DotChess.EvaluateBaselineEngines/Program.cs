@@ -12,8 +12,8 @@ namespace DotChess.EvaluateBaselineEngines
 		static void Main(string[] args)
 		{
 
-
-			EvalImpl(new ExtendedChessEngineAdapter(new QueenGambitOrBailout(new HardcodedTablebaseChessEngine(new TruncatedMinimaxChessEngine(512.0,65536,5,TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimple), Utils.LoadOpeningTablebase(File.ReadAllText("tablebase.txt"))))), new ExtendedChessEngineAdapter(new TruncatedMinimaxChessEngine(512.0, 65536, 5, TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimple)), "Minimax+Tablebase", "Minimax");
+			IReadOnlyDictionary<(Piece[,],bool), ReadOnlyMemory<Move>> openingTablebase = Utils.LoadOpeningTablebase(File.ReadAllText("tablebase.txt"));
+			EvalImpl(new ExtendedChessEngineAdapter(new QueenGambitOrBailout(new HardcodedTablebaseChessEngine(new TruncatedMinimaxChessEngine(512.0,65536,5,TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimple), openingTablebase))), new ExtendedChessEngineAdapter(new QueenGambitOrBailout(new HardcodedTablebaseChessEngine(new TruncatedMinimaxChessEngine(512.0, 65536, 5, TruncatedMinimaxChessEngine.ComputeAdvantageBalanceSimpleV2), openingTablebase))), "Minimax+Tablebase", "Minimax+Tablebase+NewEval");
 			//EvalImpl(new MonteCarloChessEngine(100, 1.0, 0.99), new ExtendedChessEngineAdapter(GreedyCaptureRandomChessEngine.instance), "a", "b");
 
 		}
